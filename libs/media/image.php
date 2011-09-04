@@ -186,6 +186,23 @@ class ImageMedia extends Media {
 		list($left, $top) = $this->_boxify($width, $height, $gravity);
 		return $this->Adapters->dispatchMethod($this, 'crop', array($left, $top, $width, $height));
 	}
+	
+	function fitGrid($cols, $width, $height, $sideGutter, $bottomGutter) {
+		$width = ($cols*$width) + ($sideGutter * ($cols-1));
+		
+		//how many rows should it fill ?
+		$r = $this->width() / $width;
+		$h = $this->height() / $r;
+		
+		$treshold = $height/2;
+		
+		for ($i=1; $i<5; $i++) {
+			$rH = ($i*$height) + ($bottomGutter * ($i-1));
+			if (abs($rH - $h) <= $treshold) {
+				return $this->fitCrop($width, $rH);
+			}
+		}
+	}
 
 /**
  * Current width of media
