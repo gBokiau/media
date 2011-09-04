@@ -98,9 +98,9 @@ class Attachment extends MediaAppModel {
 			'extension'  => array('rule' => array('checkExtension', false, array(
 				'jpg', 'jpeg', 'png', 'tif', 'tiff', 'gif', 'pdf', 'tmp'
 			))),
-			'mimeType'   => array('rule' => array('checkMimeType', false, array(
-				'image/jpeg', 'image/png', 'image/tiff', 'image/gif', 'application/pdf'
-		)))),
+			//'mimeType'   => array('rule' => array('checkMimeType', false, array(
+			//	'image/jpeg', 'image/png', 'image/tiff', 'image/gif', 'application/pdf')))
+		),
 		'alternative' => array(
 			'rule'       => 'checkRepresent',
 			'on'         => 'create',
