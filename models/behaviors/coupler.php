@@ -161,16 +161,14 @@ class CouplerBehavior extends ModelBehavior {
 				'dirname' => $result[$Model->alias]['dirname'],
 				'basename' => $result[$Model->alias]['basename']
 		)));
-		if ($count > 1) {
-			return false;
+		if ($count == 1) {
+			$file  = $baseDirectory;
+			$file .= $result[$Model->alias]['dirname'];
+			$file .= DS . $result[$Model->alias]['basename'];
+
+			$File = new File($file);
+			$File->delete();
 		}
-
-		$file  = $baseDirectory;
-		$file .= $result[$Model->alias]['dirname'];
-		$file .= DS . $result[$Model->alias]['basename'];
-
-		$File = new File($file);
-		$File->delete();
 		return true;
 	}
 
