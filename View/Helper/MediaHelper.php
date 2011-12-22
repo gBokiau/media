@@ -52,6 +52,32 @@ class MediaHelper extends AppHelper {
  */
 	var $helpers = array('Html');
 
+
+/**
+ * Minimized attributes
+ *
+ * @var array
+ */
+	protected $_minimizedAttributes = array(
+		'compact', 'checked', 'declare', 'readonly', 'disabled', 'selected',
+		'defer', 'ismap', 'nohref', 'noshade', 'nowrap', 'multiple', 'noresize'
+	);
+
+/**
+ * Format to attribute
+ *
+ * @var string
+ */
+	protected $_attributeFormat = '%s="%s"';
+
+/**
+ * Format to attribute
+ *
+ * @var string
+ */
+	protected $_minimizedAttributeFormat = '%s="%s"';
+
+
 /**
  * Tags
  *
@@ -230,7 +256,7 @@ class MediaHelper extends AppHelper {
 				$attributes = $this->_addDimensions($sources[0]['file'], $attributes);
 
 				return sprintf(
-					$this->Html->tags['image'],
+					$this->Html->_tags['image'],
 					$sources[0]['url'],
 					$this->_parseAttributes($attributes)
 				);
