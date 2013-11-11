@@ -288,9 +288,7 @@ class MediaHelper extends HtmlHelper {
 			$link = $options['url'];
 			unset($options['url']);
 
-			return $this->link($this->embed($paths, $options), $link, array(
-				'escape' => false
-			));
+			return $this->_link($this->embed($paths, $options), $link);
 		}
 		$options = array_merge($default, $options);
 		extract($options + $default);
