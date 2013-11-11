@@ -49,19 +49,6 @@ require_once 'Mime/Type.php';
 class MediaHelper extends HtmlHelper {
 
 /**
- * Tags
- *
- * @var array
- */
-	public $tags = array(
-		'audio'  => '<audio%s>%s%s</audio>',
-		'video'  => '<video%s>%s%s</video>',
-		'source' => '<source%s/>',
-		'object' => '<object%s>%s%s</object>',
-		'param'  => '<param%s/>'
-	);
-
-/**
  * Directory paths mapped to URLs. Can be modified by passing custom paths as
  * settings to the constructor.
  *
@@ -85,7 +72,15 @@ class MediaHelper extends HtmlHelper {
  *                        trailing slash.
  */
 	public function __construct(View $View, $settings = array()) {
+		$this->_tags = array_merge($this->_tags, array(
+			'audio'  => '<audio%s>%s%s</audio>',
+			'video'  => '<video%s>%s%s</video>',
+			'source' => '<source%s/>',
+			'object' => '<object%s>%s%s</object>',
+			'param'  => '<param%s/>'
+		));
 		parent::__construct($View, $settings);
+		unset($settings['configFile']);
 		$this->_paths = array_merge($this->_paths, (array) $settings);
 	}
 
@@ -204,39 +199,27 @@ class MediaHelper extends HtmlHelper {
 				$body = null;
 
 				foreach ($sources as $source) {
-					$body .= sprintf(
-						$this->tags['source'],
-						$this->_parseAttributes(array(
-							'src' => $source['url'],
-							'type' => $source['mimeType']
-					)));
+					$body .= $this->useTag(
+						'source',
+						array('src' => $source['url'],'type' => $source['mimeType']));
 				}
 				$attributes += compact('autoplay', 'controls', 'preload', 'loop');
-				return sprintf(
-					$this->tags['audio'],
-					$this->_parseAttributes($attributes),
-					$body,
-					$fallback
-				);
+				return $this->useTag('audio', $attributes, $body, $fallback);
 			case 'document':
 				break;
 			case 'image':
 				$attributes = $this->_addDimensions($sources[0]['file'], $attributes);
-
-				return $this->useTag('image',
-					h($sources[0]['url']),
-					$this->_parseAttributes($attributes)
-				);
+				return $this->useTag('image', h($sources[0]['url']), $attributes);
 			case 'video':
 				$body = null;
 
 				foreach ($sources as $source) {
-					$body .= sprintf(
-						$this->tags['source'],
-						$this->_parseAttributes(array(
+					$body .= $this->useTag(
+						'source',
+						array(
 							'src'  => $source['url'],
 							'type' => $source['mimeType']
-					)));
+					));
 				}
 				if ($poster) {
 					$attributes = $this->_addDimensions($this->file($poster), $attributes);
@@ -244,12 +227,7 @@ class MediaHelper extends HtmlHelper {
 				}
 
 				$attributes += compact('autoplay', 'controls', 'preload', 'loop', 'poster');
-				return sprintf(
-					$this->tags['video'],
-					$this->_parseAttributes($attributes),
-					$body,
-					$fallback
-				);
+				return $this->useTag('video', $attributes, $body, $fallback);
 			default:
 				break;
 		}
@@ -398,9 +376,9 @@ class MediaHelper extends HtmlHelper {
 				);
 				break;
 		}
-		return sprintf(
-			$this->tags['object'],
-			$this->_parseAttributes($attributes),
+		return $this->useTag(
+			'object',
+			$attributes,
 			$this->_parseParameters($parameters),
 			$fallback
 		);
@@ -587,10 +565,7 @@ class MediaHelper extends HtmlHelper {
 			} elseif ($value === false) {
 				$value = 'false';
 			}
-			$parameters[] = sprintf(
-				$this->tags['param'],
-				$this->_parseAttributes(array('name' => $key, 'value' => $value))
-			);
+			$parameters[] = $this->useTag('param', array('name' => $key, 'value' => $value));
 		}
 		return implode("\n", $parameters);
 	}
@@ -608,10 +583,21 @@ class MediaHelper extends HtmlHelper {
 		$encoded = implode('/', $parts);
 		return str_replace($path, $encoded, $url);
 	}
-	
-	private function _link($html, $url) {
+
+/**
+ * Generates 'link' tags around around embedded media files,
+ * bypassing HtmlHelper::link() to use standard url resolving instead
+ * of the inherited MediaHelper::url()
+ *
+ * @param string $html Content that will appear inside the link tag
+ * @param string|array $url Either a relative string url like `/products/view/23` or
+ *    an array of url parameters.  Using an array for urls will allow you to leverage
+ *    the reverse routing features of CakePHP.
+ * @return string The formatted link element
+ */	
+	protected function _link($html, $url) {
 		$url = parent::url($url);
-		return sprintf($this->_tags['link'], $url, null, $html);
+		return $this->useTag('link', $url, null, $html);
 	}
 
 }
