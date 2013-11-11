@@ -182,9 +182,7 @@ class MediaHelper extends HtmlHelper {
 			$link = $options['url'];
 			unset($options['url']);
 
-			return $this->link($this->embed($paths, $options), $link, array(
-				'escape' => false
-			));
+			return $this->_link($this->embed($paths, $options), $link);
 		}
 		$options = array_merge($default, $options);
 		extract($options, EXTR_SKIP);
@@ -611,6 +609,10 @@ class MediaHelper extends HtmlHelper {
 		$parts = array_map('rawurlencode', $parts);
 		$encoded = implode('/', $parts);
 		return str_replace($path, $encoded, $url);
+	}
+	
+	private function _link($html, $url) {
+		return sprintf($this->_tags['link'], $url, array(), $html);
 	}
 
 }
