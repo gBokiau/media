@@ -79,42 +79,21 @@ class MediaHelper extends HtmlHelper {
 			'object' => '<object%s>%s%s</object>',
 			'param'  => '<param%s/>'
 		));
+		$this->_minimizedAttributes = $this->_minimizedAttributes + array('autobuffer');
 		parent::__construct($View, $settings);
 		unset($settings['configFile']);
 		$this->_paths = array_merge($this->_paths, (array) $settings);
 	}
 
-/**
- * Turns a file path into an URL (without passing it through `Router::url()`)
- *
- * Reimplemented method from Helper
- *
- * @param string $path Absolute or partial path to a file
- * @param boolean $full Forces the URL to be fully qualified
- * @return string|void An URL to the file
- *
- * NOTE FULL_BASE_URL is deprecated as of 2.4, maybe add logic to utilize App.fullBaseUrl config value,
- * NOTE that would make testing the use of _encodeUrl() possible
- */
-	public function url($path = null, $full = false) {
-		if (!$path = $this->webroot($path)) {
-			return null;
-		}
-		if ($full && strpos($path, '://') === false) {
-			$path = $this->_encodeUrl(FULL_BASE_URL) . $path;
-		}
-		return $path;
-	}
 
 /**
- * Webroot
+ * Resolve path to relative url
  *
- * Reimplemented method from Helper
  *
  * @param string $path Absolute or partial path to a file
  * @return string|void An URL to the file
  */
-	public function webroot($path) {
+	protected function _resolvePath($path) {
 		if (!$file = $this->file($path)) {
 			return null;
 		}
@@ -128,13 +107,20 @@ class MediaHelper extends HtmlHelper {
 				break;
 			}
 		}
-		$path = str_replace('\\', '/', $path);
 
-		if (strpos($path, '://') === false) {
-			$path = $this->request->webroot . $path;
-		}
+		return str_replace('\\', '/', $path);
+	}
+	
+/**
+* Deprecated
+**/
+	public function url($url=null, $full=false) {
+		$url = $this->webroot($path);
+	}
 
-		return $this->_encodeUrl($path);
+	public function webroot($path, $full=false) {
+		$url = $this->_resolvePath($path);
+		return parent::webroot($url);
 	}
 
 /**
@@ -209,7 +195,7 @@ class MediaHelper extends HtmlHelper {
 				break;
 			case 'image':
 				$attributes = $this->_addDimensions($sources[0]['file'], $attributes);
-				return $this->useTag('image', h($sources[0]['url']), $attributes);
+				return $this->image('/'.$sources[0]['url'], $attributes);
 			case 'video':
 				$body = null;
 
@@ -487,11 +473,11 @@ class MediaHelper extends HtmlHelper {
  * @param boolean $full When `true` will generate absolute URLs.
  * @return array|boolean An array of sources each one with the keys `name`, `mimeType`, `url` and `file`.
  */
-	protected function _sources($paths, $full = false) {
+	protected function _sources($paths) {
 		$sources = array();
 
 		foreach ($paths as $path) {
-			if (!$url = $this->url($path, $full)) {
+			if (!$url = $this->_resolvePath($path)) {
 				return false;
 			}
 			if (strpos('://', $path) !== false) {
@@ -525,31 +511,6 @@ class MediaHelper extends HtmlHelper {
 	}
 
 /**
- * Generates attributes from options. Overwritten from Helper::_parseAttributes
- * to take new minimized HTML5 attributes used here into account.
- *
- * @param array $options Array of options.
- * @param array $exclude Array of options to be excluded, the options here will not be part of the return.
- * @param string $insertBefore String to be inserted before options.
- * @param string $insertAfter String to be inserted after options.
- * @return string Composed attributes.
- */
-	protected function _parseAttributes($options, $exclude = NULL, $insertBefore = ' ', $insertAfter = NULL) {
-		$attributes = array();
-		$this->_minimizedAttributes = array('autoplay', 'controls', 'autobuffer', 'loop');
-
-		foreach ($options as $key => $value) {
-			if (in_array($key, $this->_minimizedAttributes)) {
-				if ($value === 1 || $value === true || $value === 'true' || $value == $key) {
-					$attributes[] = sprintf('%s="%s"', $key, $key);
-					unset($options[$key]);
-				}
-			}
-		}
-		return parent::_parseAttributes($options) . ' ' . implode(' ', $attributes);
-	}
-
-/**
  * Generates `param` tags
  *
  * @param array $options
@@ -570,19 +531,6 @@ class MediaHelper extends HtmlHelper {
 		return implode("\n", $parameters);
 	}
 
-/**
- * Encodes an URL for use in HTML attributes.
- *
- * @param string $url The url to encode.
- * @return string The url encoded for URL contexts.
- */
-	protected function _encodeUrl($url) {
-		$path = parse_url($url, PHP_URL_PATH);
-		$parts = array_map('rawurldecode', explode('/', $path));
-		$parts = array_map('rawurlencode', $parts);
-		$encoded = implode('/', $parts);
-		return str_replace($path, $encoded, $url);
-	}
 
 /**
  * Generates 'link' tags around around embedded media files,
