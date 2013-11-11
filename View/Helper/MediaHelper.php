@@ -612,6 +612,9 @@ class MediaHelper extends HtmlHelper {
 	}
 	
 	private function _link($html, $url) {
+		if ($url !== null) {
+			$url = parent::url($url);
+		}
 		return sprintf($this->_tags['link'], $url, array(), $html);
 	}
 
