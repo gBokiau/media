@@ -20,7 +20,6 @@ require_once 'Media/Process/Generic.php';
  * Images can only scaled down but never scaled up.
  */
 class Media_Process_Image extends Media_Process_Generic {
-
 	/**
 	 * Alias for fitInside.
 	 *
@@ -222,7 +221,7 @@ class Media_Process_Image extends Media_Process_Generic {
 				return false;
 			}
 		}
-		return true;;
+		return true;
 	}
 
 	/**

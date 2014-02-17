@@ -88,18 +88,20 @@ class Media_Process_Generic {
 	/**
 	 * Stores the media to a file or resource.
 	 *
-	 * @param string|resource $source Eitehr an absolute path to a file or a writable ressource.
-	 * @param boolean $overwrite Controls overwriting of an existent file, defaults to `false`.
+	 * @param string|resource $source Either an absolute path to a file or a writable ressource.
+	 * @param array $options Ressource store options
+	 *     -  boolean $overwrite Controls overwriting of an existent file, defaults to `false`.
+	 *     -  string $mode File mode to save ressource, defaults to 0644
 	 * @return string|resource|boolean
 	 */
 	public function store($source, array $options = array()) {
-		$options += array('overwrite' => false);
+		$options += array('overwrite' => false, 'mode'=>'0644');
 
 		if (is_resource($source)) {
 			$handle = $source;
 
 			rewind($handle);
-			$result = $this->_adapter->store($handle);
+			$result = $this->_adapter->store($handle) && chmod($handle, $options['mode']);
 		} else {
 			if (file_exists($source)) {
 				if ($options['overwrite']) {
@@ -109,12 +111,15 @@ class Media_Process_Generic {
 				}
 			}
 			$handle = fopen($source, 'wb');
-			$result = $this->_adapter->store($handle);
+			$result = $this->_adapter->store($handle) && chmod($source, $options['mode']);
 			fclose($handle);
 		}
 		return $result ? $source : false;
 	}
 
+	public function storeMulti($handle, $adjoin = false) {
+		return $this->_adapter->storeMulti($handle, $adjoin);
+	}
 	/**
 	 * Converts the media to given MIME type.
 	 *
@@ -147,6 +152,17 @@ class Media_Process_Generic {
 		}
 		return $this;
 	}
+	public function nextImage() {
+		$this->_adapter = $this->_adapter->nextImage();
+	}
+	public function hasNextImage() {
+		return $this->_adapter->hasNextImage();
+	}
+	
+	public function count()  {
+		return $this->_adapter->count();
+	}
+	
 }
 
 ?>

@@ -47,16 +47,13 @@ class Media_Process_Adapter_Imagick extends Media_Process_Adapter {
 		// $this->_object->readImageFile($handle);
 		$this->_object->readImageBlob(stream_get_contents($handle, -1, 0));
 
-		// Reset iterator to get just the first image from i.e. multipage PDFs.
-		if ($this->_object->getNumberImages() > 1) {
-			$this->_object->setFirstIterator();
-		}
-
 		$mimeType = Mime_Type::guessType($handle);
 
 		if (!isset($this->_formatMap[$mimeType])) {
 			throw new OutOfBoundsException("MIME type `{$mimeType}` cannot be mapped to a format.");
 		}
+		$this->_object = $this->_object->coalesceImages();
+
 		// We need to explictly `setFormat()` here, otherwise `getFormat()` returns `null`.
 		$this->_object->setFormat($this->_formatMap[$mimeType]);
 	}
@@ -66,12 +63,21 @@ class Media_Process_Adapter_Imagick extends Media_Process_Adapter {
 			$this->_object->clear();
 		}
 	}
-
+	
+	public function nextImage() {
+		$this->_object->nextImage();
+		return $this;
+	}
+	
 	public function store($handle) {
 		// @fixme Workaround for imagick failing to work with handles before module version 3.0.
 		// See http://pecl.php.net/bugs/bug.php?id=16932 for more information.
 		// return $this->_object->writeImageFile($handle);
 		return fwrite($handle, $this->_object->getImageBlob());
+	}
+	
+	public function storeMulti($handle, $adjoin = false) {
+		return $this->_object->writeImages($handle, $adjoin);
 	}
 
 	public function convert($mimeType) {
@@ -189,6 +195,10 @@ class Media_Process_Adapter_Imagick extends Media_Process_Adapter {
 
 	public function height() {
 		return $this->_object->getImageHeight();
+	}
+	
+	public function count() {
+		return $this->_object->getNumberImages();
 	}
 }
 

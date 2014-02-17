@@ -129,6 +129,7 @@ class GeneratorBehavior extends ModelBehavior {
 			return false;
 		}
 		return $this->make($Model, $file);
+		/* TODO : in case of multiple images, save number of images extracted to table */
 	}
 
 /**
@@ -284,24 +285,7 @@ class GeneratorBehavior extends ModelBehavior {
 			return $action == 'copy' ? chmod($destination, $mode) : true;
 		}
 
-		/* Process `Media_Process_*` instructions */
 		$Media = Media_Process::factory(array('source' => $file));
-		foreach ($process['instructions'] as $method => $args) {
-			if (is_int($method)) {
-				$method = $args;
-				$args = null;
-			}
-			if (method_exists($Media, $method)) {
-				$result = call_user_func_array(array($Media, $method), (array) $args);
-			} else {
-				$result = $Media->passthru($method, $args);
-			}
-			if ($result === false) {
-				return false;
-			} elseif (is_a($result, 'Media_Process_Generic')) {
-				$Media = $result;
-			}
-		}
 
 		/* Determine destination file */
 		$extension = null;
@@ -312,13 +296,55 @@ class GeneratorBehavior extends ModelBehavior {
 			} else {
 				$extension = Mime_Type::guessExtension($file);
 			}
+		}		
+
+		if (isset($process['instructions']['images']) && $process['instructions']['images'] == 0) {
+			$multi = true;
+			$adjoin = false;
+			$limit = $Media->count();
+			if (isset($process['instructions']['animate'])) {
+				$adjoin = ($process['instructions']['animate'] === null) ? true : $process['instructions']['animate'];
+			} elseif ($extension == 'gif') {
+				$adjoin = true;
+			}
+		} else {
+			$multi = false;
+			$limit = 1;
 		}
+		unset($process['instructions']['images']);
+		unset($process['instructions']['animate']);
+		$i=0;
+
+		while ($i < $limit) {
+			$this->log(array($process, $Media, $i, $limit));
+			foreach ($process['instructions'] as $method => $args) {
+				if (is_int($method)) {
+					$method = $args;
+					$args = null;
+				}
+				if (method_exists($Media, $method)) {
+					call_user_func_array(array($Media, $method), (array) $args);
+				} else {
+					$Media->passthru($method, $args);
+				}
+			}
+			$i++;
+			if ($i != $limit) {
+				$Media->nextImage();
+			}
+		}
+
 		$destination = $this->_destinationFile($file, $process['directory'], $extension, $overwrite);
 
 		if (!$destination) {
 			return false;
 		}
-		return $Media->store($destination) && chmod($destination, $mode);
+		
+		if (!$multi) {
+			return $Media->store($destination, array('mode'=>$mode, 'overwrite'=>$overwrite));
+		} else {
+			return $Media->storeMulti($destination, $adjoin, array('mode'=>$mode, 'overwrite'=>$overwrite));
+		}
 	}
 
 /**
