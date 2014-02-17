@@ -155,9 +155,6 @@ class Media_Process_Generic {
 	public function nextImage() {
 		$this->_adapter = $this->_adapter->nextImage();
 	}
-	public function hasNextImage() {
-		return $this->_adapter->hasNextImage();
-	}
 	
 	public function count()  {
 		return $this->_adapter->count();
