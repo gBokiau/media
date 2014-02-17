@@ -24,7 +24,7 @@ require_once 'Mime/Type.php';
 require_once 'Media/Info.php';
 
 /**
- * Coupler Behavior Class
+ * Meta Behavior Class
  *
  * If you set metadataLevel to a value greater then zero, you’ll get additional
  * metadata on each consecutive find operation.
@@ -40,6 +40,22 @@ require_once 'Media/Info.php';
  * @package       Media.Model.Behavior
  */
 class MetaBehavior extends ModelBehavior {
+
+/**
+ * Cache configuration.
+ *
+ * config
+ *   The name of the cache configuration to use
+ *
+ * keyPrefix
+ *   The prefix to use for the cache data identifier
+ *
+ * @var array
+ */
+	public static $cacheConfig = array(
+		'config'    => 'default',
+		'keyPrefix' => 'media_metadata_'
+	);
 
 /**
  * Default settings
@@ -75,9 +91,12 @@ class MetaBehavior extends ModelBehavior {
 			$this->settings[$Model->alias] = $this->_defaultSettings;
 		}
 
-		$this->settings[$Model->alias] = array_merge($this->settings[$Model->alias], (array) $settings);
+		$this->settings[$Model->alias] = array_merge($this->settings[$Model->alias], (array)$settings);
 
-		$this->__cached[$Model->alias] = Cache::read('media_metadata_' . $Model->alias);
+		extract(MetaBehavior::$cacheConfig);
+		/* @var $config string */
+		/* @var $keyPrefix string */
+		$this->__cached[$Model->alias] = Cache::read($keyPrefix . $Model->alias, $config);
 	}
 
 /**
@@ -86,9 +105,13 @@ class MetaBehavior extends ModelBehavior {
  * @return void
  */
 	public function __destruct() {
+		extract(MetaBehavior::$cacheConfig);
+		/* @var $config string */
+		/* @var $keyPrefix string */
+
 		foreach ($this->__cached as $alias => $data) {
 			if ($data) {
-				Cache::write('media_metadata_' . $alias, $data);
+				Cache::write($keyPrefix . $alias, $data, $config);
 			}
 		}
 	}
@@ -103,7 +126,7 @@ class MetaBehavior extends ModelBehavior {
  * @return mixed False if the operation should abort. Any other result will continue.
  */
 	public function beforeSave(Model $Model, $options = array()) {
-		if ($Model->exists() || !isset($Model->data[$Model->alias]['file'])) {
+		if (!isset($Model->data[$Model->alias]['file'])) {
 			return true;
 		}
 		extract($this->settings[$Model->alias]);
@@ -132,7 +155,7 @@ class MetaBehavior extends ModelBehavior {
 		extract($this->settings[$Model->alias]);
 		/* @var $level integer */
 
-		foreach ($results as $key => &$result) {
+		foreach ($results as &$result) {
 			if (!isset($result[$Model->alias]['file'])) {
 				continue;
 			}
@@ -153,17 +176,18 @@ class MetaBehavior extends ModelBehavior {
  * @param integer $level level of amount of info to add, `0` disable, `1` for basic, `2` for detailed info
  * @return mixed Array with results or false if file is not readable
  */
-	public function metadata($Model, $file, $level = 1) {
+	public function metadata(Model $Model, $file, $level = 1) {
 		if ($level < 1) {
 			return array();
 		}
-		extract($this->settings[$Model->alias]);
 		$File = new File($file);
 
 		if (!$File->readable()) {
 			return false;
 		}
 		$checksum = $File->md5(true);
+
+		$data = array();
 
 		if (isset($this->__cached[$Model->alias][$checksum])) {
 			$data = $this->__cached[$Model->alias][$checksum];
@@ -185,7 +209,8 @@ class MetaBehavior extends ModelBehavior {
 				foreach ($Info->all() as $key => $value) {
 					$data[2][Inflector::underscore($key)] = $value;
 				}
-			} catch (Exception $E) {}
+			} catch (Exception $E) {
+			}
 		}
 
 		for ($i = $level, $result = array(); $i > 0; $i--) {
