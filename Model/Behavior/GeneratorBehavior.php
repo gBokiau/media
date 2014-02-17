@@ -316,7 +316,6 @@ class GeneratorBehavior extends ModelBehavior {
 		$i=0;
 
 		while ($i < $limit) {
-			$this->log(array($process, $Media, $i, $limit));
 			foreach ($process['instructions'] as $method => $args) {
 				if (is_int($method)) {
 					$method = $args;
