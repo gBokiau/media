@@ -57,11 +57,15 @@ class CouplerBehavior extends ModelBehavior {
  *
  * baseDirectory
  *   An absolute path (with trailing slash) to a directory which will be stripped off the file path
+ * forceDelete
+ *   If set to true, record deletion will proceed even if original media file was not
+ *   found in baseDirectory. Defaults to false. This will not delete generated versions
  *
  * @var array
  */
 	protected $_defaultSettings = array(
-		'baseDirectory' => MEDIA_TRANSFER
+		'baseDirectory' => MEDIA_TRANSFER,
+		'forceDelete' => false
 	);
 
 /**
@@ -180,7 +184,8 @@ class CouplerBehavior extends ModelBehavior {
 		$file .= DS . $result[$Model->alias]['basename'];
 
 		$File = new File($file);
-		return $File->delete();
+		$success = $File->delete();
+		return ($this->settings[$Model->alias]['forceDelete']) ? true : $success;
 	}
 
 /**
