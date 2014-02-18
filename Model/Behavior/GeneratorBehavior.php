@@ -75,6 +75,16 @@ class GeneratorBehavior extends ModelBehavior {
  *           type of the destination file.
  *   true - Try to guess extension by looking at the MIME type of the resulting file.
  *
+ * cascadeDeletion
+ *   false - When a record is being deleted, generated versions are kept to avoid data loss
+ *           in case the relationship between versions and original file was wrongly assumed
+ *   true - Try to guess which generated versions correspond to record being deleted
+ *          and try to delete these files.
+ *
+ * forceDelete
+ *   false - When an error occurs upon file deletion, record deletion is halted
+ *   true - Record deletion is continued regardless of whether generated versions
+ *           were successfully deleted or not
  * @var array
  */
 	protected $_defaultSettings = array(
@@ -86,7 +96,9 @@ class GeneratorBehavior extends ModelBehavior {
 		'filter'              => null,
 		'mergeFilter'         => false,
 		'overwrite'           => false,
-		'guessExtension'      => true
+		'guessExtension'      => true,
+		'cascadeDeletion'	  => false,
+		'forceDelete'		  => false
 	);
 
 /**
@@ -165,6 +177,8 @@ class GeneratorBehavior extends ModelBehavior {
 		/* @var $mergeFilter boolean */
 		/* @var $overwrite boolean */
 		/* @var $guessExtension boolean */
+		/* @var $cascadeDeletion boolean */
+		/* @var $forceDelete boolean */
 
 		list($file, $relativeFile) = $this->_file($Model, $file);
 		$relativeDirectory = DS . rtrim(dirname($relativeFile), '.');
@@ -417,5 +431,45 @@ class GeneratorBehavior extends ModelBehavior {
 
 		return $filter[$name];
 	}
+	
+	public function beforeDelete(Model $Model, $cascade = true) {
+		if (!$cascade || !($this->settings[$Model->alias]['cascadeDeletion'] === true)) {
+			return true;
+		}
 
+		$result = $Model->find('first', array(
+			'conditions' => array($Model->primaryKey => $Model->id),
+			'fields'	 => array('dirname', 'basename'),
+			'recursive'  => -1
+		));
+		if (empty($result)) {
+			return false;
+		}
+
+		$pattern  = MEDIA_FILTER . "*/";
+		$pattern .= $result[$Model->alias]['dirname'] . '/';
+		$pattern .= pathinfo($result[$Model->alias]['basename'], PATHINFO_FILENAME);
+
+		$files = glob("{$pattern}.*");
+
+		$name = Mime_Type::guessName($result[$Model->alias]['basename']);
+		$versions = array_keys(Configure::read('Media.filter.' . $name));
+
+		$success = true;
+		
+		if (count($files) > count($versions)) {
+			$message  = 'MediaFile::beforeDelete - ';
+			$message .= "Pattern `{$pattern}` matched more than number of versions. ";
+			$message .= "Failing deletion of versions and record for `Media@{$this->id}`.";
+			CakeLog::write('warning', $message);
+			$success = false;
+		} else {
+			foreach ($files as $file) {
+				$File = new File($file);
+				$success = $success && $File->delete();
+			}
+		}
+		
+		return ($this->settings[$Model->alias]['forceDelete'] === true) ? true : $success;
+	}
 }

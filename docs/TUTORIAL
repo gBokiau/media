@@ -251,64 +251,23 @@ the transfer behavior's documentation for information about the rules.
 ...
 }}}
 
-Be advised that some of these rules may be to strict or cause other trouble so that
+Be advised that some of these rules may be too strict or cause other trouble so that
 in the end you won't be able to upload files.
 
 Deleting Corresponding Files
 ----------------------------
-Deleting works as you'd expect (with one exception). First it is assumed that
-there is a 1:1 relationship between files and records. So when deleting a
-record, coupled to a file, the Coupler behavior will also go and delete that
-file. 
+Deleting works as you'd expect (with a few exceptions).
 
-Now that one exception is generated versions derived from the coupled file
-*will not* get deleted automatically. For this piece of functionality you'll
-need to implement the logic on your own. Following a snippet which does this in
-an exemplary way.  Add it to to the model you've attached Generator and
-Coupler behaviors to.
+First it is assumed that there is a 1:1 relationship between files and records.
+When deleting a record, coupled to a file, the Coupler behavior will also go
+and delete that file.
+However, if the file deletion fails because the file is not found or for
+some other reason, record deletion is halted. To force the deletion of records 
+regardless of whether the related file was successfully deleted or not, set the
+'forceDelete' setting to true in Coupler behavior.
 
-{{{
-	public function beforeDelete($cascade = true) {
-		if (!$cascade) {
-			return true;
-		}
-
-		$result = $this->find('first', array(
-			'conditions' => array($this->primaryKey => $this->id),
-			'fields'	 => array('dirname', 'basename'),
-			'recursive'  => -1
-		));
-		if (empty($result)) {
-			return false;
-		}
-
-		$pattern  = MEDIA_FILTER . "*/";
-		$pattern .= $result[$this->alias]['dirname'] . '/';
-		$pattern .= pathinfo($result[$this->alias]['basename'], PATHINFO_FILENAME);
-
-		$files = glob("{$pattern}.*");
-
-		$name = Mime_Type::guessName($result[$this->alias]['basename']);
-		$versions = array_keys(Configure::read('Media.filter.' . $name));
-
-		if (count($files) > count($versions)) {
-			$message  = 'MediaFile::beforeDelete - ';
-			$message .= "Pattern `{$pattern}` matched more than number of versions. ";
-			$message .= "Failing deletion of versions and record for `Media@{$this->id}`.";
-			CakeLog::write('warning', $message);
-			return false;
-		}
-
-		foreach ($files as $file) {
-			$File = new File($file);
-
-			if (!$File->delete()) {
-				return false;
-			}
-		}
-		return true;
-	}
-}}}
+Secondly, generated versions derived from the coupled file *will not* get deleted automatically unless the 'cascadeDeletion' is explicitly set to true in the
+Generator behavior. 
 
 _Reasoning_: Derived versions are not deleted automatically because there are
 many different scenarios in which some of them don't allow to create a
@@ -317,3 +276,10 @@ files a1 and a2 belong to original a but not vice versa.  In order to leave
 wrong assumptions out (which in case of file deletion might cause data loss!)
 the explicit implementation is the most flexible way to do so.
 
+In some scenarios (for instance when a filter generates more than one file)
+you will want to implement a custom logic by adding a 
+beforeDelete callback to the model you've attached Generator and Coupler behaviors to.
+
+The Generator behavior also has a 'forceDelete' setting, which is disabled by default,
+meaning record deletion will be halted if all the assumed version files were not
+deleted successfully.
