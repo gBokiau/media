@@ -77,6 +77,14 @@ class Media_Process_Adapter_Imagick extends Media_Process_Adapter {
 	}
 	
 	public function storeMulti($handle, $adjoin = false) {
+		if ($adjoin) {
+			if (method_exists($this->_object, 'optimizeImageLayers')) {
+				$result = $this->_object->optimizeImageLayers();
+				if (!is_bool($result)) {
+					$this->_object = $result;
+				}
+			}
+		}
 		return $this->_object->writeImages($handle, $adjoin);
 	}
 
