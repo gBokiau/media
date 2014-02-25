@@ -19,6 +19,17 @@
 App::uses('File', 'Utility');
 App::uses('ModelBehavior', 'Model');
 
+
+/**
+ * Exceptions
+ * To be moved upon consistent rewrite of error and exception reporting
+ */
+
+class MediaException extends CakeException {}
+class MediaDeleteException extends MediaException {
+	protected $_messageTemplate = 'Some Media file(s) could not be deleted : %s.';
+}
+
 /**
  * Coupler Behavior Class
  *
@@ -57,7 +68,7 @@ class CouplerBehavior extends ModelBehavior {
  *
  * baseDirectory
  *   An absolute path (with trailing slash) to a directory which will be stripped off the file path
- * forceDelete
+ * alwaysDeleteRecord
  *   If set to true, record deletion will proceed even if original media file was not
  *   found in baseDirectory. Defaults to false. This will not delete generated versions
  *
@@ -65,8 +76,20 @@ class CouplerBehavior extends ModelBehavior {
  */
 	protected $_defaultSettings = array(
 		'baseDirectory' => MEDIA_TRANSFER,
-		'forceDelete' => false
+		'alwaysDeleteRecord' => false
 	);
+
+/**
+ * File Deletion Errors
+ *
+ * If coupled files could not be deleted upon record deletion in beforeDelete(), 
+ * the errors are stored here before being thrown as an exception in the afterDelete() 
+ * callback. This is set to public to facilitate error reporting if the Exception is caught
+ * in the controller.
+ *    
+ * @var Array
+ */	
+	public $deleteErrors = array();
 
 /**
  * Setup
@@ -158,9 +181,8 @@ class CouplerBehavior extends ModelBehavior {
 	}
 
 /**
- * Callback, deletes file (if there's one coupled) corresponding to record. If
- * the file couldn't be deleted the callback will stop the delete operation and
- * not continue to delete the record.
+ * Callback, deletes file (if there's one coupled) corresponding to record. 
+ * See alwaysDeleteRecord setting above for how failure to delete the file is managed
  *
  * @param Model $Model Model using this behavior
  * @param boolean $cascade If true records that depend on this record will also be deleted
@@ -182,12 +204,36 @@ class CouplerBehavior extends ModelBehavior {
 		$file  = $baseDirectory;
 		$file .= $result[$Model->alias]['dirname'];
 		$file .= DS . $result[$Model->alias]['basename'];
-
-		$File = new File($file);
-		$success = $File->delete();
-		return ($this->settings[$Model->alias]['forceDelete']) ? true : $success;
+		
+		if (!@unlink($file)) {
+			if (!array_key_exists($Model->alias, $this->deleteErrors)) {
+				$this->deleteErrors[$Model->alias] = array();
+			}
+			$error = error_get_last();
+			$this->deleteErrors[$Model->alias][$file] = $error['message'];
+			
+			if (!$this->settings[$Model->alias]['alwaysDeleteRecord']) {
+				// The Notice is triggered as a precaution, but in production it is
+				// advised to check Coupler->deleteErrors when a record fails to be deleted
+				// to see if the error originated here and why			
+				trigger_error($error['message'], E_USER_NOTICE);
+				return false;
+			}
+		}
+		return true;
 	}
-
+	
+/**
+ * Callback, throws Exception if files could not be deleted
+ *
+ */
+	public function afterDelete(Model $Model) {
+		if (array_key_exists($Model->alias, $this->deleteErrors)) {
+			if (count($errors = $this->deleteErrors[$Model->alias])) {
+				throw new MediaDeleteException(array('files' => join(array_values($errors), ', ')));
+			}
+		}
+	}
 /**
  * Callback, adds the `file` field to each result.
  *
