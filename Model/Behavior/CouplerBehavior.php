@@ -84,12 +84,11 @@ class CouplerBehavior extends ModelBehavior {
  *
  * If coupled files could not be deleted upon record deletion in beforeDelete(), 
  * the errors are stored here before being thrown as an exception in the afterDelete() 
- * callback. This is set to public to facilitate error reporting if the Exception is caught
- * in the controller.
+ * callback. Errors can be accessed with deletionErrors() method.
  *    
  * @var Array
  */	
-	public $deleteErrors = array();
+	protected $_deleteErrors = array();
 
 /**
  * Setup
@@ -206,16 +205,17 @@ class CouplerBehavior extends ModelBehavior {
 		$file .= DS . $result[$Model->alias]['basename'];
 		
 		if (!@unlink($file)) {
-			if (!array_key_exists($Model->alias, $this->deleteErrors)) {
-				$this->deleteErrors[$Model->alias] = array();
+			if (!array_key_exists($Model->alias, $this->_deleteErrors)) {
+				$this->_deleteErrors[$Model->alias] = array();
 			}
 			$error = error_get_last();
-			$this->deleteErrors[$Model->alias][$file] = $error['message'];
+			$this->_deleteErrors[$Model->alias][$file] = $error['message'];
 			
 			if (!$this->settings[$Model->alias]['alwaysDeleteRecord']) {
 				// The Notice is triggered as a precaution, but in production it is
-				// advised to check Coupler->deleteErrors when a record fails to be deleted
-				// to see if the error originated here and why			
+				// advised to use $Model->Behaviors->Coupler->deletionErrors() 
+				// when a record fails to be deleted to see if the error
+				// originated here and why			
 				trigger_error($error['message'], E_USER_NOTICE);
 				return false;
 			}
@@ -228,10 +228,8 @@ class CouplerBehavior extends ModelBehavior {
  *
  */
 	public function afterDelete(Model $Model) {
-		if (array_key_exists($Model->alias, $this->deleteErrors)) {
-			if (count($errors = $this->deleteErrors[$Model->alias])) {
-				throw new MediaDeleteException(array('files' => join(array_values($errors), ', ')));
-			}
+		if ($errors = $this->deletionErrors($Model)) {
+			throw new MediaDeleteException(array('files' => join(array_values($errors), ', ')));
 		}
 	}
 /**
@@ -277,5 +275,20 @@ class CouplerBehavior extends ModelBehavior {
 		$value = current($check);
 		return !empty($value);
 	}
-
+/**
+ * Checks if errors were encountered while trying to delete files coupled with records
+ *
+ * @param Model $Model Model using this behavior
+ * @return mixed false if no errors occured, an array containg files that failed to delete
+ * with associated errors in the format
+ * array(
+ *    '/path/to/file' => 'Full php error message'
+ * )
+ */
+	public function deletionErrors(Model $Model) {
+		if (array_key_exists($Model->alias, $this->_deleteErrors) && count($errors = $this->_deleteErrors[$Model->alias])) {
+			return $errors;
+		}
+		return false;
+	}
 }
